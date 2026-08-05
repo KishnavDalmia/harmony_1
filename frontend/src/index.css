@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-spotify-dark text-white font-sans;
+  }
+}
+
+@layer components {
+  .mood-gradient {
+    background: linear-gradient(135deg, #1DB954 0%, #191414 100%);
+  }
+
+  .mood-card {
+    @apply bg-spotify-light rounded-xl p-6 shadow-lg transition-all duration-300 hover:shadow-xl;
+  }
+
+  .mood-badge {
+    @apply px-4 py-2 rounded-full text-sm font-medium;
+  }
+
+  .spotify-button {
+    @apply bg-spotify-green text-black font-semibold py-3 px-6 rounded-full hover:bg-green-400 transition-colors duration-200;
+  }
+
+  .glass-effect {
+    @apply bg-white bg-opacity-10 backdrop-blur-md;
+  }
+
+  .pulse-ring {
+    @apply animate-pulse-slow rounded-full;
+  }
+
+  .floating-element {
+    @apply animate-float;
+  }
+
+  .glowing-border {
+    @apply border border-spotify-green border-opacity-30 rounded-lg p-1;
+  }
+}
+
+@layer utilities {
+  .text-spotify-green {
+    @apply text-[#1DB954];
+  }
+
+  .bg-spotify-green {
+    @apply bg-[#1DB954];
+  }
+
+  .hover-spotify-green:hover {
+    @apply bg-[#1ed760];
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-spotify-dark;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-spotify-gray rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-spotify-light;
+  }
+}
