@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, ShieldCheck, Settings as SettingsIcon, LogOut, CreditCard } from 'lucide-react';
+import { User, Bell, ShieldCheck, LogOut } from 'lucide-react';
 
 function Settings({ isAuthenticated, onLogin, onLogout }) {
   return (
@@ -30,7 +30,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
               className="spotify-button"
             >
               <LogOut size={16} />
-              <span className="ml-2">Disconnect Spotify</span>
+              <span className="ml-2">Disconnect Demo Session</span>
             </motion.button>
           ) : (
             <motion.button
@@ -38,7 +38,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
               onClick={onLogin}
               className="spotify-button"
             >
-              Connect Spotify
+              Connect SoundCloud
             </motion.button>
           )}
         </div>

@@ -1,9 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Heart, TrendingUp, Activity } from 'lucide-react';
+import { Clock, Heart } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { getHistory as fetchHistory } from '../services/harmonyApi';
 
 function History({ moodHistory, recommendations }) {
+  const [lastFmHistory, setLastFmHistory] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchHistory()
+      .then((history) => {
+        if (!mounted) return;
+        const tracks = Array.isArray(history) ? history : history?.tracks || [];
+        setLastFmHistory(tracks.slice(0, 6));
+      })
+      .catch(() => {
+        if (mounted) setLastFmHistory([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       <motion.div
@@ -13,7 +34,7 @@ function History({ moodHistory, recommendations }) {
       >
         <div>
           <h1 className="text-3xl font-bold">History</h1>
-          <p className="text-spotify-gray mt-1">Review your recent moods and recommendations.</p>
+          <p className="text-spotify-gray mt-1">Review your recent moods, recommendations, and Last.fm scrobbles.</p>
         </div>
       </motion.div>
 
@@ -21,31 +42,35 @@ function History({ moodHistory, recommendations }) {
         <div className="bg-spotify-light rounded-2xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <Clock size={20} className="text-spotify-green" />
-            <h2 className="text-xl font-semibold">Mood Timeline</h2>
+            <h2 className="text-xl font-semibold">Last.fm Listening History</h2>
           </div>
 
           <div className="space-y-3">
-            {moodHistory.length === 0 ? (
-              <p className="text-spotify-gray">No mood history yet. Start detecting your mood to save entries.</p>
+            {lastFmHistory.length === 0 ? (
+              <p className="text-spotify-gray">No Last.fm history available yet. Add your Last.fm API key and username in the environment to populate recent tracks.</p>
             ) : (
-              moodHistory.map((entry) => (
+              lastFmHistory.map((entry, index) => (
                 <motion.div
-                  key={entry.id}
+                  key={entry.id || `${entry.name}-${index}`}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   className="bg-spotify-dark rounded-2xl p-4"
                 >
                   <div className="flex justify-between items-center gap-4 mb-2">
-                    <div>
-                      <h3 className="font-semibold capitalize">{entry.mood}</h3>
-                      <p className="text-xs text-spotify-gray">{format(parseISO(entry.timestamp), 'MMM d, h:mm a')}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img src={entry.image} alt={entry.name} className="w-12 h-12 rounded-lg object-cover" />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold truncate">{entry.name}</h3>
+                        <p className="text-xs text-spotify-gray truncate">{entry.artist}</p>
+                      </div>
                     </div>
-                    <div className="text-sm text-spotify-gray">Confidence {Math.round(entry.confidence * 100)}%</div>
+                    <div className="text-xs text-spotify-gray whitespace-nowrap">
+                      {entry.timestamp ? format(parseISO(entry.timestamp), 'MMM d, h:mm a') : 'Recently played'}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-sm text-spotify-gray">
-                    <div>Intensity: {entry.intensity}/10</div>
-                    <div>Emotion count: {Object.keys(entry.emotions || {}).length}</div>
-                    <div>Saved from sample session</div>
+                  <div className="grid grid-cols-2 gap-3 text-sm text-spotify-gray">
+                    <div>{entry.album || 'Recent track'}</div>
+                    <div className="text-right">{entry.matchScore ? `${Math.round(entry.matchScore * 100)}% match` : 'Scrobbled'}</div>
                   </div>
                 </motion.div>
               ))

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Smile, Frown, Meh, Heart, Zap, Wind, Sun, Moon, Music, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Smile, Frown, Meh, Heart, Zap, Sun, Moon, Music } from 'lucide-react';
 
 const moodData = {
   happy: {

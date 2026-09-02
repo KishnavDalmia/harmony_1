@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, RefreshCw, TrendingUp, TrendingDown, Activity, Clock, BarChart3, Heart, Music, Smile } from 'lucide-react';
+import { Camera, RefreshCw, Activity, Heart, BarChart3 } from 'lucide-react';
 import MoodVisualizer from '../components/MoodVisualizer';
-import WebcamCapture from '../components/WebcamCapture';
 
 function MoodAnalysis({ currentMood, onMoodDetected, showWebcam, setShowWebcam }) {
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [history, setHistory] = useState([]);
 
   // Sample mood trends for demo
   const moodTrends = [
@@ -37,7 +35,6 @@ function MoodAnalysis({ currentMood, onMoodDetected, showWebcam, setShowWebcam }
         timestamp: currentMood.timestamp
       });
 
-      setHistory(prev => [currentMood, ...prev.slice(0, 4)]);
     }
   }, [currentMood]);
 
@@ -198,7 +195,7 @@ function MoodAnalysis({ currentMood, onMoodDetected, showWebcam, setShowWebcam }
       </motion.div>
 
       {/* Detailed Analysis */}
-      {analysisData && (
+      {analysisData && analysisData.emotions && Object.keys(analysisData.emotions).length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -235,13 +232,13 @@ function MoodAnalysis({ currentMood, onMoodDetected, showWebcam, setShowWebcam }
                       strokeWidth="4"
                       fill="none"
                       strokeDasharray="226"
-                      strokeDashoffset={226 - (226 * score)}
+                      strokeDashoffset={226 - (226 * Number(score || 0))}
                       strokeLinecap="round"
                       className="origin-center"
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-sm font-medium">{Math.round(score * 100)}%</span>
+                    <span className="text-sm font-medium">{Math.round(Number(score || 0) * 100)}%</span>
                   </div>
                 </div>
                 <div className="capitalize text-sm">{emotion}</div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, MoreVertical, TrendingUp, Clock, Music } from 'lucide-react';
+import { Play, Pause, Heart, MoreVertical, Music } from 'lucide-react';
 
 function RecommendationCard({ track, index, onPlay, isPlaying, mood }) {
   const [isLiked, setIsLiked] = useState(false);

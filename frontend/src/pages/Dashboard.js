@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Music, History, TrendingUp, Clock, User, Settings, Play, Pause } from 'lucide-react';
+import { Camera, Music, History, TrendingUp, Clock, Play, Pause } from 'lucide-react';
 import MoodVisualizer from '../components/MoodVisualizer';
 import RecommendationCard from '../components/RecommendationCard';
 import { format, parseISO } from 'date-fns';
@@ -13,6 +13,7 @@ function Dashboard({
   isAuthenticated,
   onLogin,
   onMoodDetected,
+  onTrackSelect,
   showWebcam,
   setShowWebcam
 }) {
@@ -43,8 +44,9 @@ function Dashboard({
   ];
 
   const handlePlayTrack = (track) => {
-    // In a real app, this would play the track
-    console.log('Playing track:', track.name);
+    if (onTrackSelect) {
+      onTrackSelect(track);
+    }
   };
 
   return (
@@ -73,7 +75,7 @@ function Dashboard({
               onClick={onLogin}
               className="spotify-button"
             >
-              Connect Spotify
+              Connect SoundCloud
             </motion.button>
           ) : (
             <motion.button
@@ -263,7 +265,7 @@ function Dashboard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img
-                src={currentTrack.image}
+                src={currentTrack.image || 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=400&q=80'}
                 alt={currentTrack.name}
                 className="w-12 h-12 rounded-lg object-cover"
               />

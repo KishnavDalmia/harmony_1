@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { motion } from 'framer-motion';
 import { detectMood as detectMoodApi } from '../services/harmonyApi';
+import { normalizeMoodResult } from '../utils/moodUtils';
 import { Camera, CameraOff, Loader2, Smile, Frown, Meh, Heart, Zap, Wind, Sun, Moon, Music } from 'lucide-react';
 
 const moodIcons = {
@@ -34,7 +35,6 @@ function WebcamCapture({ onMoodDetected }) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [moodResult, setMoodResult] = useState(null);
   const [error, setError] = useState(null);
-  const [facingMode, setFacingMode] = useState('user');
   const [videoConstraints, setVideoConstraints] = useState({
     width: 640,
     height: 480,
@@ -64,7 +64,7 @@ function WebcamCapture({ onMoodDetected }) {
         console.warn('Backend mood detection failed, falling back to simulated mode:', apiError);
       }
 
-      const moodResultData = result?.mood || simulateMoodDetection();
+      const moodResultData = normalizeMoodResult(result?.mood || result || simulateMoodDetection());
 
       setMoodResult(moodResultData);
 
@@ -120,11 +120,12 @@ function WebcamCapture({ onMoodDetected }) {
   };
 
   const toggleCamera = () => {
-    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
-    setVideoConstraints(prev => ({
-      ...prev,
-      facingMode: prev.facingMode === 'user' ? 'environment' : 'user'
-    }));
+    const nextFacingMode = videoConstraints.facingMode === 'user' ? 'environment' : 'user';
+    setVideoConstraints({
+      width: 640,
+      height: 480,
+      facingMode: nextFacingMode,
+    });
   };
 
   const retryCapture = () => {
@@ -237,7 +238,7 @@ function WebcamCapture({ onMoodDetected }) {
         )}
       </div>
 
-      {moodResult && (
+      {moodResult && moodResult.emotions && Object.keys(moodResult.emotions).length > 0 && (
         <div className="bg-spotify-light rounded-lg p-4">
           <h4 className="font-semibold mb-3">Emotion Breakdown</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -245,13 +246,13 @@ function WebcamCapture({ onMoodDetected }) {
               <div key={emotion} className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="capitalize">{emotion}</span>
-                  <span>{(score * 100).toFixed(0)}%</span>
+                  <span>{(Number(score || 0) * 100).toFixed(0)}%</span>
                 </div>
                 <div className="h-2 bg-spotify-black rounded-full overflow-hidden">
                   <motion.div
                     className={`h-full ${moodColors[emotion] || 'bg-white'}`}
                     initial={{ width: 0 }}
-                    animate={{ width: `${score * 100}%` }}
+                    animate={{ width: `${Number(score || 0) * 100}%` }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>

@@ -40,10 +40,15 @@ class OrchestratorAgent:
     def process_session(self, user_id: str, image_data: str) -> Dict:
         from datetime import datetime
 
-        mood_data = self.detect_mood(user_id, image_data)
-        recommendations = self.recommender_agent.recommend(mood_data["mood"], mood_data["details"]["audio_features"], limit=5)
-        ranked_recommendations = self.recommender_agent.rank_suggestions(recommendations, mood_data["mood"])
         user_history = self.history_agent.get_history(user_id, limit=1000)
+        mood_data = self.detect_mood(user_id, image_data)
+        recommendations = self.recommender_agent.recommend(
+            mood_data["mood"],
+            mood_data["details"]["audio_features"],
+            limit=5,
+            user_history=user_history,
+        )
+        ranked_recommendations = self.recommender_agent.rank_suggestions(recommendations, mood_data["mood"])
         mood_entry = {
             "id": len(user_history) + 1,
             "mood": mood_data["mood"],
@@ -53,12 +58,13 @@ class OrchestratorAgent:
             "emotions": mood_data["details"]["emotion_scores"],
         }
         self.history_agent.add_mood_entry(user_id, mood_entry)
+        updated_history = self.history_agent.get_history(user_id, limit=10)
         notification = self.notification_agent.mood_alert(user_id, mood_data["mood"], mood_data["intensity"])
 
         return {
             "user": DEMO_USER,
             "mood": mood_data,
             "recommendations": ranked_recommendations,
-            "history": self.history_agent.get_history(user_id, limit=10),
+            "history": updated_history,
             "notification": notification,
         }

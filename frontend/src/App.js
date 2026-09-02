@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import WebcamCapture from './components/WebcamCapture';
-import SpotifyPlayer from './components/SpotifyPlayer';
+import SoundCloudPlayer from './components/SpotifyPlayer';
 import Dashboard from './pages/Dashboard';
 import MoodAnalysis from './pages/MoodAnalysis';
 import History from './pages/History';
@@ -15,12 +15,22 @@ function App() {
   const [moodHistory, setMoodHistory] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [, setAuthToken] = useState(localStorage.getItem('harmony_token') || null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [showWebcam, setShowWebcam] = useState(false);
 
   // Sample data for demo
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('token');
+
+    if (tokenFromUrl) {
+      localStorage.setItem('harmony_token', tokenFromUrl);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     const token = localStorage.getItem('harmony_token');
+    setAuthToken(token || null);
     if (token) {
       setIsAuthenticated(true);
       getCurrentTrack().then(setCurrentTrack).catch(() => {
@@ -34,53 +44,6 @@ function App() {
           image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
         });
       });
-    } else {
-      setCurrentTrack({
-        name: 'Blinding Lights',
-        artist: 'The Weeknd',
-        album: 'After Hours',
-        progress: 45,
-        duration: 200,
-        isPlaying: true,
-        image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
-      });
-      setMoodHistory([
-        { id: 1, mood: 'happy', intensity: 8, timestamp: new Date(Date.now() - 3600000).toISOString(), confidence: 0.92 },
-        { id: 2, mood: 'calm', intensity: 6, timestamp: new Date(Date.now() - 1800000).toISOString(), confidence: 0.88 },
-        { id: 3, mood: 'energetic', intensity: 9, timestamp: new Date(Date.now() - 900000).toISOString(), confidence: 0.95 },
-      ]);
-      setRecommendations([
-        {
-          id: 1,
-          name: 'Blinding Lights',
-          artist: 'The Weeknd',
-          album: 'After Hours',
-          mood: 'energetic',
-          matchScore: 0.94,
-          audioFeatures: { energy: 0.85, valence: 0.75, danceability: 0.88 },
-          image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
-        },
-        {
-          id: 2,
-          name: 'Levitating',
-          artist: 'Dua Lipa',
-          album: 'Future Nostalgia',
-          mood: 'happy',
-          matchScore: 0.91,
-          audioFeatures: { energy: 0.82, valence: 0.91, danceability: 0.85 },
-          image: 'https://i.scdn.co/image/ab67616d00004851555137157d184471b8d447d0',
-        },
-        {
-          id: 3,
-          name: 'Sunflower',
-          artist: 'Post Malone, Swae Lee',
-          album: 'Spider-Man: Into the Spider-Verse',
-          mood: 'calm',
-          matchScore: 0.89,
-          audioFeatures: { energy: 0.65, valence: 0.78, danceability: 0.72 },
-          image: 'https://i.scdn.co/image/ab67616d000048518863bc11d269504f94859340',
-        },
-      ]);
     }
   }, []);
 
@@ -106,11 +69,34 @@ function App() {
     }
   };
 
+  const handleTrackSelect = (track) => {
+    const nextTrack = {
+      ...track,
+      isPlaying: true,
+      progress: Number(track.progress || 0),
+    };
+
+    setCurrentTrack(nextTrack);
+
+  };
+
+  const handlePlayPause = (nextState) => {
+    setCurrentTrack((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        isPlaying: typeof nextState === 'boolean' ? nextState : !prev.isPlaying,
+      };
+    });
+  };
+
   const handleLogin = async () => {
     try {
       const { token } = await apiLogin();
+
       if (token) {
         setIsAuthenticated(true);
+        setAuthToken(token);
         localStorage.setItem('harmony_token', token);
         const track = await getCurrentTrack();
         setCurrentTrack(track);
@@ -122,6 +108,7 @@ function App() {
 
   const handleLogout = async () => {
     setIsAuthenticated(false);
+    setAuthToken(null);
     localStorage.removeItem('harmony_token');
     await apiLogout();
     setCurrentTrack(null);
@@ -157,7 +144,7 @@ function App() {
         <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-spotify-black flex-col p-6 border-r border-spotify-gray">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-spotify-green">Harmony</h1>
-            <p className="text-sm text-spotify-gray">Spotify Mood Analyzer</p>
+            <p className="text-sm text-spotify-gray">Mood Analyzer Prototype</p>
           </div>
 
           <nav className="flex-1">
@@ -195,7 +182,7 @@ function App() {
                 onClick={handleLogin}
                 className="w-full spotify-button transition-colors"
               >
-                Connect Spotify
+                Connect SoundCloud
               </motion.button>
             )}
           </div>
@@ -224,6 +211,7 @@ function App() {
                       isAuthenticated={isAuthenticated}
                       onLogin={handleLogin}
                       onMoodDetected={handleMoodDetected}
+                      onTrackSelect={handleTrackSelect}
                       showWebcam={showWebcam}
                       setShowWebcam={setShowWebcam}
                     />
@@ -293,11 +281,9 @@ function App() {
         {/* Player Bar */}
         {currentTrack && (
           <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-spotify-black border-t border-spotify-gray p-4">
-            <SpotifyPlayer
+            <SoundCloudPlayer
               track={currentTrack}
-              onNext={() => {}}
-              onPrevious={() => {}}
-              onPlayPause={() => {}}
+              onPlayPause={handlePlayPause}
             />
           </div>
         )}
