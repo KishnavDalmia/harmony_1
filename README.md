@@ -35,6 +35,24 @@ cp .env.example .env
 # Edit .env with your AWS and Spotify credentials
 ```
 
+### Spotify OAuth Setup
+
+For "Connect Spotify" / real playback to work, configure Spotify OAuth once:
+
+1. Create/open your app at <https://developer.spotify.com/dashboard>.
+2. Under **Settings → Redirect URIs**, add the backend callback **exactly**:
+   ```
+   http://127.0.0.1:8000/callback
+   ```
+   (No trailing slash. Spotify treats `localhost` and `127.0.0.1` as different
+   hosts — use the same value everywhere, including `backend/.env`.)
+3. Ensure your app requests the scopes `user-read-currently-playing`,
+   `user-read-playback-state`, `user-read-recently-played`, `user-top-read`,
+    and `user-read-private` (the app requests these automatically at login).
+
+Mood detection and song recommendations work **without** Spotify; the Spotify
+connection powers live, personalized **Spotify Recommendations** (mood targets + your recently-played as seeds), your real profile,and a recently-played listening history for the History page.
+
 ### Running the Application
 
 ```bash
@@ -164,6 +182,25 @@ result = agent.detect_mood(base64_image_data)
 }
 ```
 
+**UserPreferences Table Schema** (created alongside `MoodHistory`):
+```json
+{
+  "TableName": "UserPreferences",
+  "KeySchema": [
+    {"AttributeName": "user_id", "KeyType": "HASH"}
+  ],
+  "AttributeDefinitions": [
+    {"AttributeName": "user_id", "AttributeType": "S"}
+  ],
+  "BillingMode": "PAY_PER_REQUEST"
+}
+```
+
+> Numeric attributes (`entry_id`, `intensity`, `confidence`, emotion scores)
+> are stored as DynamoDB Number values. The backend converts Python floats to
+> `Decimal` on write and back to `int`/`float` on read so boto3 accepts the
+> writes and FastAPI can JSON-encode the responses.
+
 **Usage Example**:
 ```python
 from agents.history_agent import HistoryAgent
@@ -188,7 +225,31 @@ stats = agent.get_statistics("user123")
 trends = agent.get_mood_trends("user123", "week")
 ```
 
-### 3. Amazon S3 - Temporary Storage
+### 3. Mistral - Recommendation Reranking
+
+When `MISTRAL_API_KEY` is set, the recommender sends the locally scored tracks
+and recent Spotify listening history to Mistral for a final ordering. If Mistral
+is unavailable or returns invalid JSON, local ranking is returned unchanged.
+
+```bash
+MISTRAL_API_KEY=your_mistral_api_key
+MISTRAL_MODEL=mistral-small-latest
+```
+
+> **To enable Mistral reranking**:
+>
+> 1. Create a Mistral API key at <https://console.mistral.ai>.
+> 2. Add it to `backend/.env` as `MISTRAL_API_KEY` (optionally choose a model
+>    via `MISTRAL_MODEL`).
+>
+> If the key is missing or the request fails, the recommender logs a clear
+> message and falls back to local ranking, so the app keeps working.
+
+The integration test mocks the Mistral response, so it is safe to run
+offline. A deployment smoke test should run with a valid Mistral API key and a
+connected Spotify account.
+
+### 4. Amazon S3 - Temporary Storage
 
 **Purpose**: Temporary storage for facial analysis images
 
@@ -226,6 +287,11 @@ trends = agent.get_mood_trends("user123", "week")
 ### Recommendations
 - `POST /recommendations` - Get mood-based song recommendations
 
+When logged in, this hits the **Spotify Recommendations API** live: the mood's
+audio profile becomes `target_energy`/`target_valence`/etc, and your recently-played
+tracks/artists become the seeds, so results reflect both mood and taste. When not
+logged in, it falls back to the local sample song library.
+
 ### History & Analytics
 - `GET /history` - Get mood history
 - `GET /history/stats` - Get mood statistics
@@ -240,7 +306,7 @@ trends = agent.get_mood_trends("user123", "week")
 
 ```bash
 cd backend
-python test_aws_integration.py
+python -m pytest test_aws_integration.py -q
 ```
 
 ### Test Coverage
@@ -249,8 +315,10 @@ python test_aws_integration.py
 |-----------|-----------|--------|
 | Facial Agent (Mock) | Unit Test | ✅ Passing |
 | Facial Agent (AWS Fallback) | Integration Test | ✅ Passing |
-| History Agent (Memory) | Unit Test | ⚠️ Needs Fix |
-| History Agent (DynamoDB Fallback) | Integration Test | ⚠️ Needs Fix |
+| History Agent (Memory) | Unit Test | Passing |
+| History Agent (DynamoDB Fallback) | Integration Test | Passing |
+| Mistral Recommendation Reranking | Integration Test (mocked) | Passing |
+| Spotify Listening History | Integration Test (mocked) | Passing |
 | Mood Trends | Functional Test | ✅ Passing |
 
 ### Test Results
@@ -304,7 +372,10 @@ AWS_S3_BUCKET=harmony-frames
 # AWS Services Toggle
 USE_AWS_REKOGNITION=true
 USE_AWS_DYNAMODB=true
-USE_AWS_BEDROCK=false
+
+# Mistral LLM reranker (external API, no IAM needed)
+MISTRAL_API_KEY=your_mistral_api_key
+MISTRAL_MODEL=mistral-small-latest
 
 # Spotify API Configuration
 SPOTIFY_CLIENT_ID=your_spotify_client_id
@@ -349,11 +420,17 @@ DEBUG=true
 # Create S3 bucket
 aws s3api create-bucket --bucket harmony-frames --region us-east-1
 
-# Create DynamoDB table
+# Create DynamoDB tables
 aws dynamodb create-table \
   --table-name MoodHistory \
   --attribute-definitions AttributeName=user_id,AttributeType=S AttributeName=entry_id,AttributeType=N \
   --key-schema AttributeName=user_id,KeyType=HASH AttributeName=entry_id,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST
+
+aws dynamodb create-table \
+  --table-name UserPreferences \
+  --attribute-definitions AttributeName=user_id,AttributeType=S \
+  --key-schema AttributeName=user_id,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
 
 # Set up S3 lifecycle policy

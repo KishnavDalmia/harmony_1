@@ -13,7 +13,8 @@ export const sampleRecommendations = [
     mood: 'energetic',
     matchScore: 0.94,
     audioFeatures: { energy: 0.85, valence: 0.75, danceability: 0.88 },
-    image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
+    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80',
+    spotifyUrl: 'https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b',
   },
   {
     id: 2,
@@ -23,7 +24,8 @@ export const sampleRecommendations = [
     mood: 'happy',
     matchScore: 0.91,
     audioFeatures: { energy: 0.82, valence: 0.91, danceability: 0.85 },
-    image: 'https://i.scdn.co/image/ab67616d00004851555137157d184471b8d447d0',
+    image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=400&q=80',
+    spotifyUrl: 'https://open.spotify.com/track/58SZgPQmD9wdxkpY0tTPIc',
   },
   {
     id: 3,
@@ -33,7 +35,8 @@ export const sampleRecommendations = [
     mood: 'calm',
     matchScore: 0.89,
     audioFeatures: { energy: 0.65, valence: 0.78, danceability: 0.72 },
-    image: 'https://i.scdn.co/image/ab67616d000048518863bc11d269504f94859340',
+    image: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?auto=format&fit=crop&w=400&q=80',
+    spotifyUrl: 'https://open.spotify.com/track/0eIubxzEPvIoKgBawqYsih',
   },
 ];
 
@@ -45,5 +48,6 @@ export const sampleTrack = {
   progress: 45,
   duration: 200,
   isPlaying: true,
-  image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
+  image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80',
+  spotifyUrl: 'https://open.spotify.com/track/6gBFP58HNfVXvTnTgsa4k1?si=5e8a8e8e9e8e4a0e',
 };

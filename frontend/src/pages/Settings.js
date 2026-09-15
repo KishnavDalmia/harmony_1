@@ -12,7 +12,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
       >
         <div>
           <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-spotify-gray mt-1">Manage your demo account and app preferences.</p>
+          <p className="text-spotify-gray mt-1">Manage your connected services and app preferences.</p>
         </div>
       </motion.div>
 
@@ -22,7 +22,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
             <User size={20} className="text-spotify-green" />
             <h2 className="text-xl font-semibold">Account</h2>
           </div>
-          <p className="text-spotify-gray mb-4">You are using the Harmony demo account for mood analysis and recommendations.</p>
+          <p className="text-spotify-gray mb-4">Spotify powers playback,and supplies your listening history.</p>
           {isAuthenticated ? (
             <motion.button
               whileTap={{ scale: 0.98 }}
@@ -30,7 +30,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
               className="spotify-button"
             >
               <LogOut size={16} />
-              <span className="ml-2">Disconnect Demo Session</span>
+              <span className="ml-2">Disconnect Spotify</span>
             </motion.button>
           ) : (
             <motion.button
@@ -38,7 +38,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
               onClick={onLogin}
               className="spotify-button"
             >
-              Connect SoundCloud
+              Connect Spotify
             </motion.button>
           )}
         </div>
@@ -48,7 +48,7 @@ function Settings({ isAuthenticated, onLogin, onLogout }) {
             <ShieldCheck size={20} className="text-spotify-green" />
             <h2 className="text-xl font-semibold">Privacy</h2>
           </div>
-          <p className="text-spotify-gray">Mood detection is simulated in this demo and no facial data is stored. Your demo session remains local to this browser.</p>
+          <p className="text-spotify-gray">Mood frames are analyzed for the current request and are not stored by the application.</p>
         </div>
       </div>
 

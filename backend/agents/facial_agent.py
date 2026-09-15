@@ -1,71 +1,73 @@
-import hashlib
 import base64
+import hashlib
 import io
 import uuid
 import os
+import logging
 from typing import Dict, Optional
 from PIL import Image
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
+
+logger = logging.getLogger(__name__)
+
 
 class FacialEmotionAgent:
     MOOD_MAP = ["happy", "calm", "energetic", "sad", "neutral", "romantic", "dreamy", "aggressive"]
     REKOGNITION_EMOTIONS = ["HAPPY", "CALM", "SURPRISED", "SAD", "CONFUSED", "DISGUSTED", "ANGRY", "FEAR"]
 
     def __init__(self):
-        # Initialize AWS clients
-        self.rekognition = boto3.client('rekognition')
-        self.s3 = boto3.client('s3')
-
         # Configuration from environment variables
         self.s3_bucket = os.getenv('AWS_S3_BUCKET', 'harmony-frames')
+        self.region = os.getenv('AWS_REGION', 'us-east-1')
         self.use_aws = os.getenv('USE_AWS_REKOGNITION', 'false').lower() == 'true'
-        self.fallback_enabled = True
+
+        # Lazy initialization: only create AWS clients when AWS is enabled
+        # and credentials are available.
+        self.rekognition = None
+        self.s3 = None
+        if self.use_aws:
+            self._init_aws_clients()
+
+    def _init_aws_clients(self):
+        """Initialize AWS clients with region and credential validation."""
+        try:
+            self.rekognition = boto3.client('rekognition', region_name=self.region)
+            self.s3 = boto3.client('s3', region_name=self.region)
+        except NoCredentialsError:
+            raise RuntimeError(
+                f"AWS Rekognition credentials are unavailable in region {self.region}."
+            ) from None
+        except Exception as e:
+            raise RuntimeError(
+                f"AWS Rekognition client initialization failed in region {self.region}: {e}"
+            ) from e
 
     def detect_mood(self, image_data: str) -> Dict:
         if not image_data:
             raise ValueError("Image data is required")
 
         if self.use_aws:
-            try:
-                return self._detect_mood_with_rekognition(image_data)
-            except Exception as e:
-                print(f"AWS Rekognition failed, falling back to mock: {e}")
-                if self.fallback_enabled:
-                    return self._detect_mood_mock(image_data)
-                raise
+            return self._detect_mood_with_rekognition(image_data)
 
+        logger.info("AWS Rekognition is disabled; using mock analysis")
         return self._detect_mood_mock(image_data)
 
     def _detect_mood_with_rekognition(self, image_data: str) -> Dict:
         """Detect mood using AWS Rekognition"""
         try:
-            # Convert base64 to image
-            image_bytes = base64.b64decode(image_data)
+            encoded_image = image_data.split(',', 1)[1] if image_data.startswith('data:') else image_data
+            image_bytes = base64.b64decode(encoded_image, validate=True)
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Upload to S3 temporarily
-            s3_key = f"temp-frames/{uuid.uuid4()}.jpg"
-            self.s3.put_object(
-                Bucket=self.s3_bucket,
-                Key=s3_key,
-                Body=image_bytes,
-                ContentType='image/jpeg'
-            )
-
-            # AWS Rekognition analysis
             response = self.rekognition.detect_faces(
-                Image={'S3Object': {'Bucket': self.s3_bucket, 'Name': s3_key}},
+                Image={'Bytes': image_bytes},
                 Attributes=['ALL']
             )
-
-            # Clean up temporary frame
-            self.s3.delete_object(Bucket=self.s3_bucket, Key=s3_key)
 
             if not response.get('FaceDetails'):
                 raise ValueError("No faces detected in the image")
 
-            # Process the first face (most prominent)
             face = response['FaceDetails'][0]
             emotions = self._process_rekognition_emotions(face)
 
@@ -87,9 +89,10 @@ class FacialEmotionAgent:
                     "mouth_open": face.get('MouthOpen', {}).get('Value')
                 }
             }
-
         except ClientError as e:
             raise Exception(f"AWS Rekognition error: {e.response['Error']['Message']}")
+        except ValueError:
+            raise
         except Exception as e:
             raise Exception(f"Facial analysis failed: {str(e)}")
 
@@ -98,7 +101,6 @@ class FacialEmotionAgent:
         emotions = {}
         rekognition_emotions = face.get('Emotions', [])
 
-        # Map AWS emotions to our emotion model
         emotion_mapping = {
             "HAPPY": "happy",
             "CALM": "calm",
@@ -110,26 +112,21 @@ class FacialEmotionAgent:
             "FEAR": "fearful"
         }
 
-        # Initialize base emotions
-        for emotion in ["happy", "sad", "angry", "surprised", "fearful", "calm", "energetic", "disgusted"]:
-            emotions[emotion] = 0.1  # Base confidence
+        for emotion in ["happy", "sad", "angry", "surprised", "fearful", "calm", "energetic", "disgusted", "neutral"]:
+            emotions[emotion] = 0.1
 
-        # Map detected emotions
         for rekognition_emotion in rekognition_emotions:
             emotion_type = rekognition_emotion['Type']
             confidence = rekognition_emotion['Confidence'] / 100.0
 
             if emotion_type in emotion_mapping:
-                emotions[emotion_mapping[emotion_type]] = max(emotions[emotion_mapping[emotion_type]], confidence)
+                mapped = emotion_mapping[emotion_type]
+                emotions[mapped] = max(emotions.get(mapped, 0.1), confidence)
 
-        # Normalize and ensure we have reasonable values
         return {k: round(min(1.0, v), 2) for k, v in emotions.items()}
 
     def _determine_primary_mood(self, emotions: Dict) -> str:
-        """Determine primary mood from emotion scores"""
         primary_emotion = max(emotions, key=emotions.get)
-
-        # Map primary emotion to mood categories
         mood_mapping = {
             "happy": "happy",
             "sad": "sad",
@@ -139,45 +136,29 @@ class FacialEmotionAgent:
             "calm": "calm",
             "disgusted": "neutral"
         }
-
         return mood_mapping.get(primary_emotion, "neutral")
 
     def _calculate_intensity(self, emotions: Dict, face: Dict) -> int:
-        """Calculate mood intensity based on emotions and facial features"""
         primary_emotion = max(emotions, key=emotions.get)
         primary_score = emotions[primary_emotion]
-
-        # Consider facial features that indicate intensity
         intensity_factors = [
             face.get('Smile', {}).get('Value', False),
             face.get('EyesOpen', {}).get('Value', True),
             face.get('MouthOpen', {}).get('Value', False)
         ]
-
-        # Base intensity from emotion score
         base_intensity = int(round(primary_score * 10))
-
-        # Adjust based on facial features
         if any(intensity_factors):
             base_intensity = min(10, base_intensity + 1)
-
         return min(10, max(1, base_intensity))
 
     def _calculate_confidence(self, face: Dict) -> float:
-        """Calculate overall confidence score"""
-        # Get the highest emotion confidence
         emotions = face.get('Emotions', [])
         if emotions:
             max_confidence = max(e['Confidence'] for e in emotions) / 100.0
         else:
             max_confidence = 0.5
-
-        # Adjust based on face detection confidence
         face_confidence = face.get('Confidence', 90.0) / 100.0
-
-        # Combine with a slight bias toward face detection confidence
         combined = (max_confidence * 0.6) + (face_confidence * 0.4)
-
         return round(min(0.98, max(0.5, combined)), 2)
 
     def _detect_mood_mock(self, image_data: str) -> Dict:

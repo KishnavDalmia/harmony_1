@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Camera, Music, History, TrendingUp, Clock, Play, Pause } from 'lucide-react';
 import MoodVisualizer from '../components/MoodVisualizer';
 import RecommendationCard from '../components/RecommendationCard';
+import TrackImage from '../components/TrackImage';
 import { format, parseISO } from 'date-fns';
 
 function Dashboard({
@@ -69,22 +70,21 @@ function Dashboard({
         </div>
 
         <div className="flex gap-3">
-          {!isAuthenticated ? (
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowWebcam(true)}
+            className="flex items-center gap-2 bg-white text-black font-semibold py-2 px-4 rounded-full hover:bg-gray-200 transition-colors"
+          >
+            <Camera size={18} />
+            Detect Mood
+          </motion.button>
+          {!isAuthenticated && (
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={onLogin}
               className="spotify-button"
             >
-              Connect SoundCloud
-            </motion.button>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowWebcam(true)}
-              className="flex items-center gap-2 bg-white text-black font-semibold py-2 px-4 rounded-full hover:bg-gray-200 transition-colors"
-            >
-              <Camera size={18} />
-              Detect Mood
+              Connect Spotify
             </motion.button>
           )}
         </div>
@@ -264,8 +264,8 @@ function Dashboard({
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img
-                src={currentTrack.image || 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=400&q=80'}
+              <TrackImage
+                src={currentTrack.image}
                 alt={currentTrack.name}
                 className="w-12 h-12 rounded-lg object-cover"
               />

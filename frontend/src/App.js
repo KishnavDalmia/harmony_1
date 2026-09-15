@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import WebcamCapture from './components/WebcamCapture';
-import SoundCloudPlayer from './components/SpotifyPlayer';
+import SpotifyPlayer from './components/SpotifyPlayer';
 import Dashboard from './pages/Dashboard';
 import MoodAnalysis from './pages/MoodAnalysis';
 import History from './pages/History';
 import Settings from './pages/Settings';
-import { login as apiLogin, logout as apiLogout, getCurrentTrack } from './services/harmonyApi';
+import { getCurrentTrack, setTokens, getStoredToken, getRefreshToken, clearTokens } from './services/harmonyApi';
 import { History as HistoryIcon, Settings as SettingsIcon, Home, TrendingUp } from 'lucide-react';
 
 function App() {
@@ -15,35 +15,48 @@ function App() {
   const [moodHistory, setMoodHistory] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [, setAuthToken] = useState(localStorage.getItem('harmony_token') || null);
+  const [, setAuthToken] = useState(getStoredToken() || null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [showWebcam, setShowWebcam] = useState(false);
 
-  // Sample data for demo
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get('token');
+    const tokenFromUrl = params.get('spotify_token');
+    const refreshTokenFromUrl = params.get('spotify_refresh_token');
+    const expiresInFromUrl = params.get('spotify_expires_in');
 
     if (tokenFromUrl) {
-      localStorage.setItem('harmony_token', tokenFromUrl);
+      setTokens({
+        accessToken: tokenFromUrl,
+        refreshToken: refreshTokenFromUrl || undefined,
+        expiresIn: Number(expiresInFromUrl) || 3600,
+      });
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    const token = localStorage.getItem('harmony_token');
+    const token = getStoredToken();
     setAuthToken(token || null);
     if (token) {
-      setIsAuthenticated(true);
-      getCurrentTrack().then(setCurrentTrack).catch(() => {
-        setCurrentTrack({
-          name: 'Blinding Lights',
-          artist: 'The Weeknd',
-          album: 'After Hours',
-          progress: 45,
-          duration: 200,
-          isPlaying: true,
-          image: 'https://i.scdn.co/image/ab67616d0000485128933b847344585462672d47',
-        });
-      });
+      // A session is only useful if it can be renewed. Old sessions (saved before
+      // refresh tokens were introduced) are cleared immediately so we don't hammer
+      // /current-track with a dead token.
+      if (!getRefreshToken()) {
+        clearTokens();
+        setAuthToken(null);
+        setIsAuthenticated(false);
+        setCurrentTrack(null);
+      } else {
+        setIsAuthenticated(true);
+        getCurrentTrack()
+          .then(setCurrentTrack)
+          .catch(() => {
+            // If the 401 interceptor cleared the tokens, the user is logged out.
+            if (!getStoredToken()) {
+              setIsAuthenticated(false);
+            }
+            setCurrentTrack(null);
+          });
+      }
     }
   }, []);
 
@@ -92,15 +105,9 @@ function App() {
 
   const handleLogin = async () => {
     try {
-      const { token } = await apiLogin();
-
-      if (token) {
-        setIsAuthenticated(true);
-        setAuthToken(token);
-        localStorage.setItem('harmony_token', token);
-        const track = await getCurrentTrack();
-        setCurrentTrack(track);
-      }
+      const response = await fetch('/spotify/auth-url');
+      const { url } = await response.json();
+      window.location.href = url;
     } catch (error) {
       console.error('Login failed', error);
     }
@@ -109,8 +116,7 @@ function App() {
   const handleLogout = async () => {
     setIsAuthenticated(false);
     setAuthToken(null);
-    localStorage.removeItem('harmony_token');
-    await apiLogout();
+    clearTokens();
     setCurrentTrack(null);
   };
 
@@ -182,7 +188,7 @@ function App() {
                 onClick={handleLogin}
                 className="w-full spotify-button transition-colors"
               >
-                Connect SoundCloud
+                Connect Spotify
               </motion.button>
             )}
           </div>
@@ -281,7 +287,7 @@ function App() {
         {/* Player Bar */}
         {currentTrack && (
           <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-spotify-black border-t border-spotify-gray p-4">
-            <SoundCloudPlayer
+            <SpotifyPlayer
               track={currentTrack}
               onPlayPause={handlePlayPause}
             />

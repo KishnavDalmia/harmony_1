@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import TrackImage from './TrackImage';
 import { motion } from 'framer-motion';
 import { Play, Pause, Heart, MoreVertical, Music } from 'lucide-react';
 
@@ -44,8 +45,8 @@ function RecommendationCard({ track, index, onPlay, isPlaying, mood }) {
       <div className="flex gap-4">
         {/* Album Art */}
         <div className="relative">
-          <img
-            src={track.image || 'https://via.placeholder.com/80'}
+          <TrackImage
+            src={track.image}
             alt={track.name}
             className="w-16 h-16 rounded-lg object-cover"
           />

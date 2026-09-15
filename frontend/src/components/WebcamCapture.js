@@ -35,6 +35,7 @@ function WebcamCapture({ onMoodDetected }) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [moodResult, setMoodResult] = useState(null);
   const [error, setError] = useState(null);
+  const [cameraStatus, setCameraStatus] = useState('requesting');
   const [videoConstraints, setVideoConstraints] = useState({
     width: 640,
     height: 480,
@@ -42,6 +43,16 @@ function WebcamCapture({ onMoodDetected }) {
   });
 
   const capture = useCallback(() => {
+    const video = webcamRef.current?.video;
+    if (!video) {
+      setError('Camera unavailable.');
+      return null;
+    }
+    if (video.readyState < 2 || !video.videoWidth) {
+      // Stream is connected but not producing frames yet (camera warming up
+      // or just flipped). Returning null lets the caller retry.
+      return null;
+    }
     const imageSrc = webcamRef.current.getScreenshot();
     setImgSrc(imageSrc);
     return imageSrc;
@@ -52,19 +63,19 @@ function WebcamCapture({ onMoodDetected }) {
       setIsCapturing(true);
       setError(null);
 
-      const imageData = capture();
+      let imageData = null;
+      for (let attempt = 0; attempt < 3 && !imageData; attempt++) {
+        if (attempt > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+        imageData = capture();
+      }
       if (!imageData) {
-        throw new Error('Unable to capture image.');
+        throw new Error('Camera is still warming up. Give it a second, then try again.');
       }
 
-      let result = null;
-      try {
-        result = await detectMoodApi(imageData);
-      } catch (apiError) {
-        console.warn('Backend mood detection failed, falling back to simulated mode:', apiError);
-      }
-
-      const moodResultData = normalizeMoodResult(result?.mood || result || simulateMoodDetection());
+      const result = await detectMoodApi(imageData);
+      const moodResultData = normalizeMoodResult(result?.mood || result);
 
       setMoodResult(moodResultData);
 
@@ -75,51 +86,31 @@ function WebcamCapture({ onMoodDetected }) {
             recommendations: result.recommendations,
             history: result.history,
           });
-        } else {
-          onMoodDetected({
-            mood: moodResultData.mood,
-            intensity: moodResultData.intensity,
-            confidence: moodResultData.confidence,
-            timestamp: new Date().toISOString(),
-            emotions: moodResultData.emotions,
-          });
         }
       }
     } catch (err) {
-      setError('Failed to detect mood. Please try again.');
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || '';
+      let message = err?.response
+        ? 'Failed to detect mood. Please try again.'
+        : (err?.message || 'Failed to detect mood. Please try again.');
+      if (status === 400) {
+        message = /no face/i.test(detail)
+          ? 'No face detected. Center your face in the frame with good lighting, then try again.'
+          : (detail || message);
+      } else if (status === 503) {
+        message = detail || 'AWS mood detection is unavailable. Check the backend AWS service configuration.';
+      }
+      setError(message);
       console.error('Mood detection error:', err);
     } finally {
       setIsCapturing(false);
     }
   }, [capture, onMoodDetected]);
 
-  const simulateMoodDetection = () => {
-    const moods = ['happy', 'calm', 'energetic', 'sad', 'neutral'];
-    const randomMood = moods[Math.floor(Math.random() * moods.length)];
-
-    // Generate some emotion scores
-    const emotions = {
-      happy: Math.random(),
-      sad: Math.random(),
-      angry: Math.random(),
-      surprised: Math.random(),
-      fearful: Math.random(),
-      calm: Math.random(),
-      energetic: Math.random()
-    };
-
-    // Boost the selected mood
-    emotions[randomMood] = Math.max(emotions[randomMood], 0.7 + Math.random() * 0.3);
-
-    return {
-      mood: randomMood,
-      intensity: Math.floor(Math.random() * 7) + 4,
-      confidence: 0.85 + Math.random() * 0.15,
-      emotions: emotions
-    };
-  };
-
   const toggleCamera = () => {
+    // The stream remounts on flip; show the loading overlay until frames flow.
+    setCameraStatus('requesting');
     const nextFacingMode = videoConstraints.facingMode === 'user' ? 'environment' : 'user';
     setVideoConstraints({
       width: 640,
@@ -173,10 +164,23 @@ function WebcamCapture({ onMoodDetected }) {
             <Webcam
               audio={false}
               ref={webcamRef}
+              onUserMedia={() => setCameraStatus('ready')}
+              onUserMediaError={() => {
+                setCameraStatus('unavailable');
+                setError('Camera unavailable.');
+              }}
               screenshotFormat="image/jpeg"
               videoConstraints={videoConstraints}
               className="w-full rounded-lg"
             />
+            {cameraStatus === 'requesting' && !error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg">
+                <span className="flex items-center gap-2 text-white">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Requesting camera...
+                </span>
+              </div>
+            )}
             <div className="absolute bottom-4 left-4 right-4 flex justify-center">
               <motion.button
                 whileTap={{ scale: 0.95 }}

@@ -7,7 +7,6 @@ function MoodAnalysis({ currentMood, onMoodDetected, showWebcam, setShowWebcam }
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Sample mood trends for demo
   const moodTrends = [
     { mood: 'happy', count: 12, percentage: 30 },
     { mood: 'calm', count: 8, percentage: 20 },
